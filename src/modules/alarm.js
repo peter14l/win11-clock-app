@@ -1,23 +1,81 @@
-import { storage, icons, showToast, showDialog, closeDialog } from './utils.js';
+import { storage, icons, showDialog, closeDialog, showToast, createFluentDropdown } from './utils.js';
 import * as audio from './audio.js';
 
 let alarms = [];
-let alarmCheckInterval = null;
-let activeTriggeredAlarm = null;
 let snoozeTimers = []; // { id, alarmId, triggerTime }
+let alarmCheckInterval = null;
+let activeTriggeredAlarm = null; // Currently ringing alarm
+
+// Array of loaded system ringtones
+let systemRingtones = [];
+let previewTimeout = null;
 
 export function initAlarmModule() {
   alarms = storage.get('alarms', [
-    { id: 1, name: 'Morning Wakeup', time: '07:00', enabled: true, repeat: [1, 2, 3, 4, 5], sound: 'chime', snooze: 10, expanded: false },
-    { id: 2, name: 'Workout Time', time: '18:30', enabled: false, repeat: [1, 3, 5], sound: 'digital', snooze: 5, expanded: false }
+    { id: 1, name: 'Daily Standup', time: '09:00', enabled: true, repeat: [1, 2, 3, 4, 5], sound: 'digital', snooze: 10 },
+    { id: 2, name: 'Morning Gym', time: '07:30', enabled: false, repeat: [1, 3, 5], sound: 'zen', snooze: 10 }
   ]);
   
-  // Start background monitoring for alarms
+  // Load preinstalled phone ringtones
+  loadSystemRingtones();
+
+  // Listen for native Android notification button actions
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.addListener('notificationAction', (event) => {
+      const id = event.id;
+      const action = event.action;
+      
+      const alarm = alarms.find(a => a.id === id);
+      if (!alarm) return;
+      
+      if (action === 'com.win11.clock.ALARM_SNOOZE') {
+        snoozeAlarm(alarm);
+        window.Capacitor.Plugins.DeviceSoundPlugin.cancelAlarmNotification({ id });
+        if (activeTriggeredAlarm && activeTriggeredAlarm.dialogId) {
+          closeDialog(activeTriggeredAlarm.dialogId);
+        }
+      } else if (action === 'com.win11.clock.ALARM_DISMISS') {
+        dismissAlarm(alarm);
+        window.Capacitor.Plugins.DeviceSoundPlugin.cancelAlarmNotification({ id });
+        if (activeTriggeredAlarm && activeTriggeredAlarm.dialogId) {
+          closeDialog(activeTriggeredAlarm.dialogId);
+        }
+      }
+    });
+
+    // Check if the app was launched by a ringing alarm on top of lock screen
+    window.Capacitor.Plugins.DeviceSoundPlugin.getLaunchIntent().then((intent) => {
+      if (intent && intent.alarmTriggered && intent.alarmId !== -1) {
+        const alarm = alarms.find(a => a.id === intent.alarmId);
+        if (alarm) {
+          // Immediately display full-screen overlay alert
+          triggerAlarm(alarm, alarm.time);
+        }
+      }
+    });
+  }
+  
   startAlarmScheduler();
 }
 
 function saveAlarms() {
   storage.set('alarms', alarms);
+}
+
+async function loadSystemRingtones() {
+  try {
+    if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+      const res = await window.Capacitor.Plugins.DeviceSoundPlugin.getRingtones();
+      if (res && res.ringtones) {
+        systemRingtones = res.ringtones.map(r => ({
+          value: r.uri,
+          text: r.title
+        }));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load system ringtones', e);
+  }
 }
 
 export function renderAlarmView(container) {
@@ -27,45 +85,47 @@ export function renderAlarmView(container) {
       <button class="fluent-btn-icon header-action-btn" id="btn-add-alarm" title="Add new alarm">${icons.plus}</button>
     </div>
     
-    <div class="alarms-container" id="alarms-list">
+    <div class="alarms-list" id="alarms-list">
       ${renderAlarmsList()}
     </div>
   `;
-
+  
   bindEvents();
+  
+  // Initialize dropdowns for any pre-expanded cards
+  const expanded = container.querySelector('.expanded-alarm-card');
+  if (expanded) {
+    const id = parseInt(expanded.dataset.id);
+    const alarm = alarms.find(a => a.id === id);
+    if (alarm) initExpandedDropdowns(alarm);
+  }
 }
 
 function renderAlarmsList() {
   if (alarms.length === 0) {
-    return `
-      <div class="empty-state-card">
-        <div class="empty-icon">${icons.alarm}</div>
-        <p>No alarms configured. Click the "+" button to add one.</p>
-      </div>
-    `;
+    return `<div class="empty-alarms">No alarms set. Click the '+' button to add one.</div>`;
   }
   
   return alarms.map(alarm => {
-    const timeParts = alarm.time.split(':');
-    let hrs = parseInt(timeParts[0]);
-    const mins = timeParts[1];
-    const ampm = hrs >= 12 ? 'PM' : 'AM';
-    hrs = hrs % 12;
-    hrs = hrs ? hrs : 12; // 0 is 12
-    const timeDisplay = `${hrs}:${mins} <span class="ampm-text">${ampm}</span>`;
-    
-    const repeatLabel = getRepeatLabel(alarm.repeat);
-    
     if (alarm.expanded) {
       return renderExpandedAlarm(alarm);
     }
     
+    const ampm = parseInt(alarm.time.split(':')[0]) >= 12 ? 'PM' : 'AM';
+    let hrs = parseInt(alarm.time.split(':')[0]) % 12;
+    hrs = hrs ? hrs : 12; // 0 should be 12
+    const timeDisplay = `${hrs}:${alarm.time.split(':')[1]}`;
+    
     return `
-      <div class="fluent-card alarm-item-card ${alarm.enabled ? '' : 'alarm-disabled'}" data-id="${alarm.id}">
-        <div class="alarm-item-clickable">
+      <div class="fluent-card alarm-item-card" data-id="${alarm.id}">
+        <div class="alarm-item-summary">
           <div class="alarm-time-block">
-            <span class="alarm-digital-time">${timeDisplay}</span>
-            <span class="alarm-meta-info">${alarm.name ? alarm.name + ' • ' : ''}${repeatLabel}</span>
+            <span class="alarm-time-digits">${timeDisplay}</span>
+            <span class="alarm-time-ampm">${ampm}</span>
+          </div>
+          <div class="alarm-info-block">
+            <div class="alarm-name">${alarm.name}</div>
+            <div class="alarm-repeat-days">${getRepeatLabel(alarm.repeat)}</div>
           </div>
           <div class="alarm-switch-container">
             <label class="fluent-switch">
@@ -80,7 +140,7 @@ function renderAlarmsList() {
 }
 
 function renderExpandedAlarm(alarm) {
-  const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // Sunday to Saturday
+  const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   
   const repeatHtml = daysOfWeek.map((day, idx) => {
     const isSelected = alarm.repeat.includes(idx);
@@ -107,21 +167,12 @@ function renderExpandedAlarm(alarm) {
         <div class="edit-alarm-row dropdown-edit-row">
           <div class="dropdown-group">
             <label class="form-label">Sound</label>
-            <select class="fluent-select" id="edit-sound-${alarm.id}">
-              <option value="digital" ${alarm.sound === 'digital' ? 'selected' : ''}>Digital Beeps</option>
-              <option value="chime" ${alarm.sound === 'chime' ? 'selected' : ''}>Classic Chime</option>
-              <option value="zen" ${alarm.sound === 'zen' ? 'selected' : ''}>Zen Bowl</option>
-            </select>
+            <div id="alarm-sound-dropdown-container-${alarm.id}"></div>
           </div>
           
           <div class="dropdown-group">
             <label class="form-label">Snooze</label>
-            <select class="fluent-select" id="edit-snooze-${alarm.id}">
-              <option value="5" ${alarm.snooze === 5 ? 'selected' : ''}>5 minutes</option>
-              <option value="10" ${alarm.snooze === 10 ? 'selected' : ''}>10 minutes</option>
-              <option value="15" ${alarm.snooze === 15 ? 'selected' : ''}>15 minutes</option>
-              <option value="30" ${alarm.snooze === 30 ? 'selected' : ''}>30 minutes</option>
-            </select>
+            <div id="alarm-snooze-dropdown-container-${alarm.id}"></div>
           </div>
         </div>
         
@@ -133,6 +184,83 @@ function renderExpandedAlarm(alarm) {
       </div>
     </div>
   `;
+}
+
+function initExpandedDropdowns(alarm) {
+  const soundContainer = document.getElementById(`alarm-sound-dropdown-container-${alarm.id}`);
+  const snoozeContainer = document.getElementById(`alarm-snooze-dropdown-container-${alarm.id}`);
+  
+  if (soundContainer && snoozeContainer) {
+    const localSounds = [
+      { value: 'digital', text: 'Digital Beeps' },
+      { value: 'chime', text: 'Classic Chime' },
+      { value: 'zen', text: 'Zen Bowl' }
+    ];
+    
+    // Combine local Web Audio API tones with native device ringtones
+    const allSounds = [...localSounds, ...systemRingtones];
+    
+    createFluentDropdown({
+      id: `edit-sound-dropdown-${alarm.id}`,
+      options: allSounds,
+      value: alarm.sound,
+      onChange: (val) => {
+        // Value updated, no automatic trigger (requires preview button click)
+      },
+      onPreview: (val, isPlaying) => {
+        handleAlarmSoundPreview(val, isPlaying);
+      },
+      container: soundContainer
+    });
+
+    const snoozeOptions = [
+      { value: '5', text: '5 minutes' },
+      { value: '10', text: '10 minutes' },
+      { value: '15', text: '15 minutes' },
+      { value: '30', text: '30 minutes' }
+    ];
+    
+    createFluentDropdown({
+      id: `edit-snooze-dropdown-${alarm.id}`,
+      options: snoozeOptions,
+      value: String(alarm.snooze),
+      onChange: (val) => {
+        // Value updated
+      },
+      container: snoozeContainer
+    });
+  }
+}
+
+function handleAlarmSoundPreview(val, isPlaying) {
+  if (previewTimeout) clearTimeout(previewTimeout);
+  
+  if (isPlaying) {
+    if (val.startsWith('content://')) {
+      if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+        window.Capacitor.Plugins.DeviceSoundPlugin.startAlarmLoop({ uri: val });
+      }
+    } else {
+      audio.playAlarmSound(val);
+    }
+    
+    // Auto-stop preview after 4 seconds and restore play icons visually in dropdown
+    previewTimeout = setTimeout(() => {
+      audio.stopAlarmSound();
+      if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+        window.Capacitor.Plugins.DeviceSoundPlugin.stopAlarmLoop();
+      }
+      document.querySelectorAll('.fluent-dropdown-item-play-btn.playing').forEach(btn => {
+        btn.classList.remove('playing');
+        btn.innerHTML = icons.play;
+      });
+    }, 4000);
+  } else {
+    audio.stopAlarmSound();
+    if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+      window.Capacitor.Plugins.DeviceSoundPlugin.stopAlarmLoop();
+    }
+  }
 }
 
 function getRepeatLabel(repeatDays) {
@@ -154,10 +282,18 @@ function bindEvents() {
   const listEl = document.getElementById('alarms-list');
   if (listEl) {
     listEl.addEventListener('click', (e) => {
-      const toggle = e.target.closest('.alarm-toggle-checkbox');
-      if (toggle) {
-        const id = parseInt(toggle.dataset.id);
-        toggleAlarm(id, toggle.checked);
+      // 1. Intercept switch toggles and stop event propagation!
+      const switchEl = e.target.closest('.fluent-switch');
+      if (switchEl) {
+        const checkbox = switchEl.querySelector('.alarm-toggle-checkbox');
+        if (checkbox) {
+          if (e.target !== checkbox) {
+            checkbox.checked = !checkbox.checked;
+          }
+          toggleAlarm(parseInt(checkbox.dataset.id), checkbox.checked);
+        }
+        e.stopPropagation();
+        e.preventDefault();
         return;
       }
       
@@ -188,9 +324,10 @@ function bindEvents() {
         return;
       }
       
-      // If clicked on the card itself, expand it
+      // If clicked on the card itself (excluding buttons/dropdown triggers), expand it
       const card = e.target.closest('.alarm-item-card');
-      if (card && !card.classList.contains('expanded-alarm-card')) {
+      const isDropdownClick = e.target.closest('.fluent-dropdown-wrapper') !== null;
+      if (card && !card.classList.contains('expanded-alarm-card') && !isDropdownClick) {
         const id = parseInt(card.dataset.id);
         expandAlarm(id);
       }
@@ -199,10 +336,8 @@ function bindEvents() {
 }
 
 function addAlarm() {
-  // Collapse others
   alarms = alarms.map(a => ({ ...a, expanded: false }));
   
-  // Set current time as base
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
@@ -225,7 +360,7 @@ function addAlarm() {
 function expandAlarm(id) {
   alarms = alarms.map(a => {
     if (a.id === id) return { ...a, expanded: true };
-    return { ...a, expanded: false }; // Collapse others
+    return { ...a, expanded: false };
   });
   refreshList();
 }
@@ -235,7 +370,6 @@ function closeAlarmEdit(id) {
     if (a.id === id) return { ...a, expanded: false };
     return a;
   });
-  // Clean up if it was a newly added and cancelled
   alarms = alarms.filter(a => !(a.id === id && a.name === 'Alarm' && a.repeat.length === 0 && a.time === ''));
   refreshList();
 }
@@ -250,7 +384,6 @@ function toggleAlarm(id, state) {
   });
   saveAlarms();
   
-  // Remove from snooze lists if toggled off
   if (!state) {
     snoozeTimers = snoozeTimers.filter(s => s.alarmId !== id);
   }
@@ -265,12 +398,15 @@ function saveAlarmDetails(id) {
   const timeVal = card.querySelector(`#edit-time-${id}`).value;
   const nameVal = card.querySelector(`#edit-name-${id}`).value.trim() || 'Alarm';
   
-  // Gather repeat days
   const activeDots = card.querySelectorAll('.day-dot-btn.active');
   const repeatVal = Array.from(activeDots).map(dot => parseInt(dot.dataset.day));
   
-  const soundVal = card.querySelector(`#edit-sound-${id}`).value;
-  const snoozeVal = parseInt(card.querySelector(`#edit-snooze-${id}`).value);
+  // Read value from custom Fluent dropdown elements
+  const soundItem = card.querySelector(`#edit-sound-dropdown-${id} .fluent-dropdown-item.selected`);
+  const soundVal = soundItem ? soundItem.dataset.value : 'digital';
+  
+  const snoozeItem = card.querySelector(`#edit-snooze-dropdown-${id} .fluent-dropdown-item.selected`);
+  const snoozeVal = snoozeItem ? parseInt(snoozeItem.dataset.value) : 10;
   
   alarms = alarms.map(a => {
     if (a.id === id) {
@@ -305,10 +441,18 @@ function refreshList() {
   const listEl = document.getElementById('alarms-list');
   if (listEl) {
     listEl.innerHTML = renderAlarmsList();
+    
+    const expandedCard = listEl.querySelector('.expanded-alarm-card');
+    if (expandedCard) {
+      const alarmId = parseInt(expandedCard.dataset.id);
+      const alarm = alarms.find(a => a.id === alarmId);
+      if (alarm) {
+        initExpandedDropdowns(alarm);
+      }
+    }
   }
 }
 
-// Background scheduler running alarms
 function startAlarmScheduler() {
   if (alarmCheckInterval) clearInterval(alarmCheckInterval);
   
@@ -316,20 +460,16 @@ function startAlarmScheduler() {
     const now = new Date();
     const currentHrs = now.getHours();
     const currentMins = now.getMinutes();
-    const currentDay = now.getDay(); // 0 is Sunday, 1 is Monday...
+    const currentDay = now.getDay();
     const timeStr = `${String(currentHrs).padStart(2, '0')}:${String(currentMins).padStart(2, '0')}`;
     
-    // Check normal alarms
     alarms.forEach(alarm => {
       if (!alarm.enabled) return;
-      if (alarm.expanded) return; // don't trigger while user is actively editing
+      if (alarm.expanded) return;
       
-      // Match time
       if (alarm.time === timeStr) {
-        // Match day if repeats are set
         const matchesDay = alarm.repeat.length === 0 || alarm.repeat.includes(currentDay);
         if (matchesDay) {
-          // Avoid triggering multiple times in the same minute
           if (activeTriggeredAlarm && activeTriggeredAlarm.id === alarm.id && activeTriggeredAlarm.triggerTime === timeStr) {
             return;
           }
@@ -338,18 +478,17 @@ function startAlarmScheduler() {
       }
     });
     
-    // Check snooze timers
     snoozeTimers.forEach((snooze, idx) => {
       if (now.getTime() >= snooze.triggerTime) {
         const alarm = alarms.find(a => a.id === snooze.alarmId);
         if (alarm && alarm.enabled) {
           triggerAlarm(alarm, timeStr, true);
         }
-        snoozeTimers.splice(idx, 1); // remove snooze timer
+        snoozeTimers.splice(idx, 1);
       }
     });
     
-  }, 5000); // Check every 5 seconds
+  }, 5000);
 }
 
 function triggerAlarm(alarm, timeStr, isSnoozed = false) {
@@ -359,10 +498,24 @@ function triggerAlarm(alarm, timeStr, isSnoozed = false) {
     isSnoozed
   };
   
-  // Play buzzer sound based on alarm settings
-  audio.playAlarmSound(alarm.sound);
+  // 1. Play ringing loop: check if it is a system ringtone URI or a local synthesized beep
+  if (alarm.sound.startsWith('content://')) {
+    if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+      window.Capacitor.Plugins.DeviceSoundPlugin.startAlarmLoop({ uri: alarm.sound });
+    }
+  } else {
+    audio.playAlarmSound(alarm.sound);
+  }
   
-  // Construct dialog body HTML
+  // 2. Show native system notification with controls (Snooze/Dismiss) and fullScreenIntent
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.showAlarmNotification({
+      id: alarm.id,
+      name: alarm.name,
+      time: alarm.time
+    });
+  }
+  
   const ampm = parseInt(alarm.time.split(':')[0]) >= 12 ? 'PM' : 'AM';
   let hrs = parseInt(alarm.time.split(':')[0]) % 12;
   hrs = hrs ? hrs : 12;
@@ -386,7 +539,11 @@ function triggerAlarm(alarm, timeStr, isSnoozed = false) {
         primary: true,
         onClick: () => {
           snoozeAlarm(alarm);
-          return false; // Allow dialog to close
+          // Dismiss native notification if any
+          if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+            window.Capacitor.Plugins.DeviceSoundPlugin.cancelAlarmNotification({ id: alarm.id });
+          }
+          return false;
         }
       },
       {
@@ -394,7 +551,11 @@ function triggerAlarm(alarm, timeStr, isSnoozed = false) {
         primary: false,
         onClick: () => {
           dismissAlarm(alarm);
-          return false; // Allow dialog to close
+          // Dismiss native notification if any
+          if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+            window.Capacitor.Plugins.DeviceSoundPlugin.cancelAlarmNotification({ id: alarm.id });
+          }
+          return false;
         }
       }
     ]
@@ -404,7 +565,11 @@ function triggerAlarm(alarm, timeStr, isSnoozed = false) {
 }
 
 function snoozeAlarm(alarm) {
+  // Stop ringing loop (local or system)
   audio.stopAlarmSound();
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.stopAlarmLoop();
+  }
   
   const snoozeTimeMs = alarm.snooze * 60 * 1000;
   const triggerTime = Date.now() + snoozeTimeMs;
@@ -420,9 +585,12 @@ function snoozeAlarm(alarm) {
 }
 
 function dismissAlarm(alarm) {
+  // Stop ringing loop (local or system)
   audio.stopAlarmSound();
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.stopAlarmLoop();
+  }
   
-  // If it is a one-time alarm (no repeats), toggle it off
   if (alarm.repeat.length === 0) {
     alarms = alarms.map(a => {
       if (a.id === alarm.id) return { ...a, enabled: false };

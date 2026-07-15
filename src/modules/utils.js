@@ -220,3 +220,135 @@ function createToastContainer() {
   document.body.appendChild(container);
   return container;
 }
+
+// Fluent Custom Dropdown Builder (avoids native system select overlays)
+export function createFluentDropdown({ id, options, value, onChange, onPreview, container }) {
+  container.innerHTML = '';
+  container.className = 'fluent-dropdown-wrapper';
+  container.id = id;
+  
+  const selectedOption = options.find(o => String(o.value) === String(value)) || options[0];
+  
+  const button = document.createElement('button');
+  button.className = 'fluent-dropdown-trigger';
+  button.innerHTML = `
+    <span class="fluent-dropdown-selected-text">${selectedOption ? selectedOption.text : 'Select...'}</span>
+    <span class="fluent-dropdown-arrow">${icons.chevronDown}</span>
+  `;
+  
+  const menu = document.createElement('div');
+  menu.className = 'fluent-dropdown-menu';
+  
+  options.forEach(opt => {
+    const item = document.createElement('div');
+    item.className = `fluent-dropdown-item ${String(opt.value) === String(value) ? 'selected' : ''}`;
+    item.dataset.value = opt.value;
+    
+    if (onPreview) {
+      item.innerHTML = `
+        <span class="fluent-dropdown-item-text">${opt.text}</span>
+        <button class="fluent-dropdown-item-play-btn" title="Preview sound">${icons.play}</button>
+      `;
+      
+      const playBtn = item.querySelector('.fluent-dropdown-item-play-btn');
+      playBtn.onclick = (e) => {
+        e.stopPropagation(); // prevent selecting
+        
+        const isPlaying = playBtn.classList.contains('playing');
+        
+        // Stop all other playing buttons inside this dropdown menu
+        menu.querySelectorAll('.fluent-dropdown-item-play-btn.playing').forEach(btn => {
+          btn.classList.remove('playing');
+          btn.innerHTML = icons.play;
+        });
+        
+        if (isPlaying) {
+          playBtn.classList.remove('playing');
+          playBtn.innerHTML = icons.play;
+          onPreview(opt.value, false);
+        } else {
+          playBtn.classList.add('playing');
+          playBtn.innerHTML = icons.stop;
+          onPreview(opt.value, true);
+        }
+      };
+    } else {
+      item.innerText = opt.text;
+    }
+    
+    item.onclick = (e) => {
+      e.stopPropagation();
+      
+      menu.querySelectorAll('.fluent-dropdown-item').forEach(el => el.classList.remove('selected'));
+      item.classList.add('selected');
+      button.querySelector('.fluent-dropdown-selected-text').innerText = opt.text;
+      
+      menu.classList.remove('visible');
+      button.classList.remove('active');
+      
+      // Stop all active preview states when selecting an item
+      if (onPreview) {
+        menu.querySelectorAll('.fluent-dropdown-item-play-btn.playing').forEach(btn => {
+          btn.classList.remove('playing');
+          btn.innerHTML = icons.play;
+        });
+        onPreview(opt.value, false);
+      }
+      
+      onChange(opt.value);
+    };
+    
+    menu.appendChild(item);
+  });
+  
+  button.onclick = (e) => {
+    e.stopPropagation();
+    
+    document.querySelectorAll('.fluent-dropdown-menu.visible').forEach(m => {
+      if (m !== menu) m.classList.remove('visible');
+    });
+    document.querySelectorAll('.fluent-dropdown-trigger.active').forEach(b => {
+      if (b !== button) b.classList.remove('active');
+    });
+    
+    const isOpen = menu.classList.contains('visible');
+    if (isOpen) {
+      menu.classList.remove('visible');
+      button.classList.remove('active');
+    } else {
+      menu.classList.add('visible');
+      button.classList.add('active');
+      
+      const rect = button.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      if (rect.bottom + 200 > windowHeight) {
+        menu.style.bottom = `${button.offsetHeight + 4}px`;
+        menu.style.top = 'auto';
+      } else {
+        menu.style.top = `${button.offsetHeight + 4}px`;
+        menu.style.bottom = 'auto';
+      }
+    }
+  };
+  
+  // Close menu on clicking outside and stop any playing previews
+  document.addEventListener('click', () => {
+    if (menu.classList.contains('visible') && onPreview) {
+      menu.querySelectorAll('.fluent-dropdown-item-play-btn.playing').forEach(btn => {
+        btn.classList.remove('playing');
+        btn.innerHTML = icons.play;
+      });
+      // We stop preview when clicking outside
+      const selectedItem = menu.querySelector('.fluent-dropdown-item.selected');
+      if (selectedItem) {
+        onPreview(selectedItem.dataset.value, false);
+      }
+    }
+    menu.classList.remove('visible');
+    button.classList.remove('active');
+  });
+  
+  container.appendChild(button);
+  container.appendChild(menu);
+}
+

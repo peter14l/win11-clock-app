@@ -1,4 +1,4 @@
-import { storage, icons, showToast, showDialog } from './utils.js';
+import { storage, icons, showDialog, closeDialog, showToast, createFluentDropdown } from './utils.js';
 import * as audio from './audio.js';
 
 let timers = [];
@@ -7,18 +7,29 @@ let activeZoomTimerId = null;
 
 export function initTimerModule() {
   timers = storage.get('timers', [
-    { id: 1, name: '1 Minute Presets', duration: 60, remaining: 60, status: 'idle' },
+    { id: 1, name: 'Tea Timer', duration: 300, remaining: 300, status: 'idle' },
     { id: 2, name: 'Egg Timer', duration: 180, remaining: 180, status: 'idle' },
-    { id: 3, name: 'Tea Timer', duration: 300, remaining: 300, status: 'idle' },
-    { id: 4, name: 'Pizza Baking', duration: 720, remaining: 720, status: 'idle' }
+    { id: 3, name: 'Pizza Bake', duration: 900, remaining: 900, status: 'idle' }
   ]);
   
-  // Clean up states on boot (load as paused/idle)
-  timers = timers.map(t => ({
-    ...t,
-    status: 'idle',
-    remaining: t.duration
-  }));
+  // Listen for native Android notification actions for timers
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.addListener('notificationAction', (event) => {
+      const id = event.id;
+      const action = event.action;
+      
+      const timer = timers.find(t => t.id === id);
+      if (!timer) return;
+      
+      if (action === 'com.win11.clock.TIMER_PAUSE') {
+        pauseTimerInternal(id);
+      } else if (action === 'com.win11.clock.TIMER_RESUME') {
+        resumeTimerInternal(id);
+      } else if (action === 'com.win11.clock.TIMER_RESET') {
+        resetTimer(id);
+      }
+    });
+  }
   
   startTimerTicker();
 }
@@ -38,49 +49,48 @@ export function renderTimerView(container) {
       ${renderTimersGrid()}
     </div>
   `;
-
+  
   bindEvents();
 }
 
 function renderTimersGrid() {
   if (timers.length === 0) {
-    return `
-      <div class="empty-state-card">
-        <div class="empty-icon">${icons.timer}</div>
-        <p>No timers configured. Click the "+" button to create one.</p>
-      </div>
-    `;
+    return `<div class="empty-timers">No timers configured. Click the '+' button to add one.</div>`;
   }
   
   return timers.map(timer => {
+    const isRunning = timer.status === 'running';
     const hrs = Math.floor(timer.remaining / 3600);
     const mins = Math.floor((timer.remaining % 3600) / 60);
     const secs = timer.remaining % 60;
+    const timeDisplay = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     
-    const timeDisplay = `${hrs > 0 ? String(hrs).padStart(2, '0') + ':' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    const playPauseIcon = timer.status === 'running' ? icons.pause : icons.play;
+    // Progress Ring offset calculations
+    const dashOffset = getDashOffset(timer);
     
     return `
-      <div class="fluent-card timer-item-card" data-id="${timer.id}">
+      <div class="fluent-card timer-item-card ${isRunning ? 'running' : ''}" data-id="${timer.id}">
         <div class="timer-card-header">
-          <span class="timer-name-text">${timer.name}</span>
-          <button class="fluent-btn-icon timer-delete-btn" data-id="${timer.id}" title="Delete timer">${icons.trash}</button>
+          <span class="timer-card-title">${timer.name}</span>
+          <button class="timer-delete-btn" data-id="${timer.id}" title="Delete timer">${icons.trash}</button>
         </div>
         
-        <div class="timer-body">
-          <div class="timer-circle-wrap">
-            <svg class="progress-ring" width="120" height="120">
-              <circle class="progress-ring__circle-bg" stroke="var(--border-color)" stroke-width="4" fill="transparent" r="50" cx="60" cy="60"/>
-              <circle class="progress-ring__circle timer-progress-circle" stroke="var(--accent-color)" stroke-dasharray="314.16" stroke-dashoffset="${getDashOffset(timer)}" stroke-linecap="round" stroke-width="5" fill="transparent" r="50" cx="60" cy="60"/>
+        <div class="timer-card-body">
+          <div class="timer-progress-ring-container">
+            <svg class="timer-progress-ring" width="112" height="112">
+              <circle class="progress-ring__circle-bg" stroke="var(--border-color)" stroke-width="4" fill="transparent" r="50" cx="56" cy="56"/>
+              <circle class="progress-ring__circle" stroke="var(--accent-color)" stroke-width="5" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="${dashOffset}" fill="transparent" r="50" cx="56" cy="56"/>
             </svg>
-            <div class="timer-display-digits">${timeDisplay}</div>
+            <div class="timer-card-digits">${timeDisplay}</div>
           </div>
         </div>
         
         <div class="timer-card-footer">
-          <button class="fluent-btn-icon timer-ctrl-btn btn-timer-toggle" data-id="${timer.id}">${playPauseIcon}</button>
-          <button class="fluent-btn-icon timer-ctrl-btn btn-timer-reset" data-id="${timer.id}">${icons.stop}</button>
-          <button class="fluent-btn-icon timer-ctrl-btn btn-timer-zoom" data-id="${timer.id}">${icons.zoom}</button>
+          <button class="fluent-btn-icon btn-timer-toggle ${isRunning ? 'active' : ''}" data-id="${timer.id}" title="${isRunning ? 'Pause' : 'Start'}">
+            ${isRunning ? icons.pause : icons.play}
+          </button>
+          <button class="fluent-btn-icon btn-timer-reset" data-id="${timer.id}" title="Reset">${icons.reset}</button>
+          <button class="fluent-btn-icon btn-timer-zoom" data-id="${timer.id}" title="Fullscreen Desk Mode">${icons.zoom}</button>
         </div>
       </div>
     `;
@@ -134,10 +144,12 @@ function startTimerTicker() {
         if (timer.remaining > 0) {
           const nextVal = timer.remaining - 1;
           
-          // If in zoom mode, update the full screen clock numbers live
           if (activeZoomTimerId === timer.id) {
             updateZoomTimerDigits(nextVal, timer.duration);
           }
+          
+          // Update native ongoing notification
+          updateNativeTimerNotification(timer.id, timer.name, nextVal, false);
           
           return { ...timer, remaining: nextVal };
         } else {
@@ -150,88 +162,95 @@ function startTimerTicker() {
     });
     
     if (changed) {
-      // Re-render local page grid without full page flash
-      updateGridTimersUI();
+      const grid = document.getElementById('timers-list-grid');
+      if (grid) grid.innerHTML = renderTimersGrid();
     }
   }, 1000);
 }
 
-function updateGridTimersUI() {
-  timers.forEach(timer => {
-    const card = document.querySelector(`.timer-item-card[data-id="${timer.id}"]`);
-    if (!card) return;
+function updateNativeTimerNotification(id, name, remainingSeconds, isPaused) {
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    const hrs = Math.floor(remainingSeconds / 3600);
+    const mins = Math.floor((remainingSeconds % 3600) / 60);
+    const secs = remainingSeconds % 60;
+    const timeDisplay = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     
-    // Update digits
-    const digitsEl = card.querySelector('.timer-display-digits');
-    if (digitsEl) {
-      const hrs = Math.floor(timer.remaining / 3600);
-      const mins = Math.floor((timer.remaining % 3600) / 60);
-      const secs = timer.remaining % 60;
-      digitsEl.innerText = `${hrs > 0 ? String(hrs).padStart(2, '0') + ':' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-    
-    // Update progress circle
-    const circle = card.querySelector('.timer-progress-circle');
-    if (circle) {
-      circle.style.strokeDashoffset = getDashOffset(timer);
-    }
-  });
+    window.Capacitor.Plugins.DeviceSoundPlugin.showTimerNotification({
+      id,
+      name,
+      remaining: timeDisplay,
+      paused: isPaused,
+      finished: false
+    });
+  }
 }
 
 function toggleTimer(id) {
+  const timer = timers.find(t => t.id === id);
+  if (!timer) return;
+  
+  if (timer.status === 'running') {
+    pauseTimerInternal(id);
+  } else {
+    resumeTimerInternal(id);
+  }
+}
+
+function pauseTimerInternal(id) {
   timers = timers.map(t => {
     if (t.id === id) {
-      const isRunning = t.status === 'running';
-      const newStatus = isRunning ? 'idle' : 'running';
-      showToast(isRunning ? 'Timer paused' : 'Timer started');
-      return { ...t, status: newStatus };
+      updateNativeTimerNotification(t.id, t.name, t.remaining, true);
+      return { ...t, status: 'paused' };
     }
     return t;
   });
   saveTimers();
-  
-  // Update toggle button icon locally
-  const card = document.querySelector(`.timer-item-card[data-id="${id}"]`);
-  if (card) {
-    const toggleBtn = card.querySelector('.btn-timer-toggle');
-    const timer = timers.find(t => t.id === id);
-    if (toggleBtn && timer) {
-      toggleBtn.innerHTML = timer.status === 'running' ? icons.pause : icons.play;
+  const grid = document.getElementById('timers-list-grid');
+  if (grid) grid.innerHTML = renderTimersGrid();
+  showToast('Timer paused');
+}
+
+function resumeTimerInternal(id) {
+  timers = timers.map(t => {
+    if (t.id === id) {
+      updateNativeTimerNotification(t.id, t.name, t.remaining, false);
+      return { ...t, status: 'running' };
     }
-  }
+    return t;
+  });
+  saveTimers();
+  const grid = document.getElementById('timers-list-grid');
+  if (grid) grid.innerHTML = renderTimersGrid();
+  showToast('Timer started');
 }
 
 function resetTimer(id) {
   timers = timers.map(t => {
     if (t.id === id) {
-      return { ...t, status: 'idle', remaining: t.duration };
+      // Clear native timer notification
+      if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+        window.Capacitor.Plugins.DeviceSoundPlugin.cancelTimerNotification({ id: t.id });
+      }
+      return { ...t, remaining: t.duration, status: 'idle' };
     }
     return t;
   });
   saveTimers();
+  const grid = document.getElementById('timers-list-grid');
+  if (grid) grid.innerHTML = renderTimersGrid();
   
-  // Reset full screen zoom view too if active
   if (activeZoomTimerId === id) {
-    const timer = timers.find(t => t.id === id);
-    updateZoomTimerDigits(timer.remaining, timer.duration);
-    const zoomPlayBtn = document.getElementById('zoom-btn-play');
-    if (zoomPlayBtn) zoomPlayBtn.innerHTML = icons.play;
-  }
-  
-  // Refresh UI
-  updateGridTimersUI();
-  
-  // Restore button state in grid
-  const card = document.querySelector(`.timer-item-card[data-id="${id}"]`);
-  if (card) {
-    const toggleBtn = card.querySelector('.btn-timer-toggle');
-    if (toggleBtn) toggleBtn.innerHTML = icons.play;
+    const active = timers.find(t => t.id === id);
+    updateZoomTimerDigits(active.duration, active.duration);
   }
   
   showToast('Timer reset');
 }
 
 function deleteTimer(id) {
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.cancelTimerNotification({ id });
+  }
   timers = timers.filter(t => t.id !== id);
   saveTimers();
   const grid = document.getElementById('timers-list-grid');
@@ -249,22 +268,16 @@ function showAddTimerDialog() {
       <span>Seconds</span>
     </div>
     <div class="picker-spinners">
-      <select class="fluent-select picker-select" id="timer-pick-hrs">
-        ${Array.from({length: 24}).map((_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
-      </select>
-      <select class="fluent-select picker-select" id="timer-pick-mins">
-        ${Array.from({length: 60}).map((_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
-      </select>
-      <select class="fluent-select picker-select" id="timer-pick-secs">
-        ${Array.from({length: 60}).map((_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
-      </select>
+      <div id="timer-pick-hrs-container" style="flex: 1;"></div>
+      <div id="timer-pick-mins-container" style="flex: 1;"></div>
+      <div id="timer-pick-secs-container" style="flex: 1;"></div>
     </div>
     <div class="picker-name-row">
-      <input type="text" class="fluent-input" id="timer-pick-name" placeholder="Timer name" value="Timer">
+      <input type="text" class="fluent-input" id="timer-pick-name" placeholder="Timer name" value="Timer" style="margin-top: 12px; width: 100%;">
     </div>
   `;
 
-  showDialog({
+  const dialogId = showDialog({
     title: 'Add Timer',
     content,
     buttons: [
@@ -272,11 +285,17 @@ function showAddTimerDialog() {
         text: 'Add',
         primary: true,
         onClick: (dialog) => {
-          const hrs = parseInt(dialog.querySelector('#timer-pick-hrs').value);
-          const mins = parseInt(dialog.querySelector('#timer-pick-mins').value);
-          const secs = parseInt(dialog.querySelector('#timer-pick-secs').value);
-          const name = dialog.querySelector('#timer-pick-name').value.trim() || 'Timer';
+          // Read selected values from the custom Fluent dropdown options
+          const hrsItem = dialog.querySelector('#timer-pick-hrs .fluent-dropdown-item.selected');
+          const hrs = hrsItem ? parseInt(hrsItem.dataset.value) : 0;
           
+          const minsItem = dialog.querySelector('#timer-pick-mins .fluent-dropdown-item.selected');
+          const mins = minsItem ? parseInt(minsItem.dataset.value) : 0;
+          
+          const secsItem = dialog.querySelector('#timer-pick-secs .fluent-dropdown-item.selected');
+          const secs = secsItem ? parseInt(secsItem.dataset.value) : 0;
+          
+          const name = dialog.querySelector('#timer-pick-name').value.trim() || 'Timer';
           const duration = (hrs * 3600) + (mins * 60) + secs;
           
           if (duration <= 0) {
@@ -298,7 +317,7 @@ function showAddTimerDialog() {
           const grid = document.getElementById('timers-list-grid');
           if (grid) grid.innerHTML = renderTimersGrid();
           showToast('Timer created!', 'success');
-          return false; // close dialog
+          return false;
         }
       },
       {
@@ -307,29 +326,74 @@ function showAddTimerDialog() {
       }
     ]
   });
+
+  // Construct custom Fluent dropdown selections inside the dialog placeholder containers
+  const dialogEl = document.getElementById(dialogId);
+  if (dialogEl) {
+    const hrsOptions = Array.from({length: 24}).map((_, i) => ({ value: String(i), text: String(i).padStart(2, '0') }));
+    const minsOptions = Array.from({length: 60}).map((_, i) => ({ value: String(i), text: String(i).padStart(2, '0') }));
+    const secsOptions = Array.from({length: 60}).map((_, i) => ({ value: String(i), text: String(i).padStart(2, '0') }));
+    
+    createFluentDropdown({
+      id: 'timer-pick-hrs',
+      options: hrsOptions,
+      value: '0',
+      onChange: () => {},
+      container: dialogEl.querySelector('#timer-pick-hrs-container')
+    });
+    
+    createFluentDropdown({
+      id: 'timer-pick-mins',
+      options: minsOptions,
+      value: '15', // default 15 minutes
+      onChange: () => {},
+      container: dialogEl.querySelector('#timer-pick-mins-container')
+    });
+    
+    createFluentDropdown({
+      id: 'timer-pick-secs',
+      options: secsOptions,
+      value: '0',
+      onChange: () => {},
+      container: dialogEl.querySelector('#timer-pick-secs-container')
+    });
+  }
 }
 
-// Timer Expiration
 function triggerTimerEnd(timer) {
-  // Sound alarm
+  // Trigger finished notification (makes system sound and vibration)
+  if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+    window.Capacitor.Plugins.DeviceSoundPlugin.showTimerNotification({
+      id: timer.id,
+      name: timer.name,
+      remaining: "00:00:00",
+      paused: false,
+      finished: true
+    });
+  }
+  
   audio.playAlarmSound('digital');
   
-  // Custom timer dialog trigger
+  const content = document.createElement('div');
+  content.className = 'timer-alert-trigger';
+  content.innerHTML = `
+    <div class="timer-trigger-bell animate-wiggle">${icons.hourglass}</div>
+    <div class="timer-trigger-title">${timer.name}</div>
+    <div class="timer-trigger-desc">Countdown complete!</div>
+  `;
+  
   showDialog({
     title: 'Timer Finished',
-    content: `
-      <div class="timer-end-dialog-body animate-wiggle">
-        <div class="timer-end-icon">${icons.timer}</div>
-        <div class="timer-end-name">${timer.name}</div>
-        <div class="timer-end-desc">Time is up!</div>
-      </div>
-    `,
+    content,
     buttons: [
       {
         text: 'Dismiss',
         primary: true,
         onClick: () => {
           audio.stopAlarmSound();
+          if (window.Capacitor && window.Capacitor.Plugins.DeviceSoundPlugin) {
+            window.Capacitor.Plugins.DeviceSoundPlugin.cancelTimerNotification({ id: timer.id });
+          }
           return false;
         }
       }
@@ -337,100 +401,78 @@ function triggerTimerEnd(timer) {
   });
 }
 
-
-// --- FULLSCREEN ZOOM MODE ---
-
+// Zoom / Fullscreen Desk Clock Overlay Mode
 function enterZoomMode(id) {
   const timer = timers.find(t => t.id === id);
   if (!timer) return;
   
   activeZoomTimerId = id;
   
-  const zoomOverlay = document.createElement('div');
-  zoomOverlay.className = 'fluent-zoom-overlay';
-  zoomOverlay.id = 'timer-zoom-overlay';
+  const overlay = document.createElement('div');
+  overlay.className = 'fullscreen-zoom-overlay';
+  overlay.id = 'timer-zoom-overlay';
   
   const hrs = Math.floor(timer.remaining / 3600);
   const mins = Math.floor((timer.remaining % 3600) / 60);
   const secs = timer.remaining % 60;
-  const timeDisplay = `${hrs > 0 ? String(hrs).padStart(2, '0') + ':' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const timeDisplay = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   
-  const playPauseIcon = timer.status === 'running' ? icons.pause : icons.play;
-  
-  zoomOverlay.innerHTML = `
-    <div class="zoom-header">
-      <span class="zoom-title">${timer.name}</span>
-      <button class="fluent-btn-icon zoom-exit-btn" id="zoom-exit-trigger" title="Exit Full Screen">${icons.close}</button>
-    </div>
-    
-    <div class="zoom-clock-container">
-      <div class="zoom-ring-wrapper">
-        <svg class="progress-ring" width="340" height="340">
-          <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.06)" stroke-width="6" fill="transparent" r="150" cx="170" cy="170"/>
-          <circle class="progress-ring__circle" id="zoom-progress-circle" stroke="var(--accent-color)" stroke-dasharray="942.48" stroke-dashoffset="${getZoomDashOffset(timer)}" stroke-linecap="round" stroke-width="8" fill="transparent" r="150" cx="170" cy="170"/>
-        </svg>
-        <div class="zoom-digits" id="zoom-digits-text">${timeDisplay}</div>
+  overlay.innerHTML = `
+    <button class="zoom-close-btn" id="btn-zoom-close" title="Exit Fullscreen">${icons.close}</button>
+    <div class="zoom-content-center">
+      <div class="zoom-timer-title">${timer.name}</div>
+      <div class="zoom-timer-digits" id="zoom-digits-text">${timeDisplay}</div>
+      
+      <div class="zoom-progress-container">
+        <div class="zoom-progress-bar-bg">
+          <div class="zoom-progress-bar-fill" id="zoom-progress-fill" style="width: ${((timer.duration - timer.remaining) / timer.duration) * 100}%;"></div>
+        </div>
       </div>
-    </div>
-    
-    <div class="zoom-footer-controls">
-      <button class="fluent-btn-icon zoom-ctrl-btn" id="zoom-btn-play" data-id="${timer.id}">${playPauseIcon}</button>
-      <button class="fluent-btn-icon zoom-ctrl-btn" id="zoom-btn-reset" data-id="${timer.id}">${icons.stop}</button>
+      
+      <div class="zoom-controls">
+        <button class="fluent-btn-icon btn-zoom-play" id="btn-zoom-play" title="Play/Pause">
+          ${timer.status === 'running' ? icons.pause : icons.play}
+        </button>
+        <button class="fluent-btn-icon btn-zoom-reset" id="btn-zoom-reset" title="Reset">${icons.reset}</button>
+      </div>
     </div>
   `;
   
-  document.body.appendChild(zoomOverlay);
+  document.body.appendChild(overlay);
   
-  // Bind overlay controls
-  document.getElementById('zoom-exit-trigger').addEventListener('click', exitZoomMode);
+  // Bind zoom close
+  document.getElementById('btn-zoom-close').onclick = () => {
+    activeZoomTimerId = null;
+    overlay.remove();
+  };
   
-  document.getElementById('zoom-btn-play').addEventListener('click', () => {
+  const playBtn = document.getElementById('btn-zoom-play');
+  playBtn.onclick = () => {
     toggleTimer(id);
-    const updatedTimer = timers.find(t => t.id === id);
-    document.getElementById('zoom-btn-play').innerHTML = updatedTimer.status === 'running' ? icons.pause : icons.play;
-  });
+    // Sync icon with new state
+    const t = timers.find(x => x.id === id);
+    playBtn.innerHTML = t.status === 'running' ? icons.pause : icons.play;
+  };
   
-  document.getElementById('zoom-btn-reset').addEventListener('click', () => {
+  document.getElementById('btn-zoom-reset').onclick = () => {
     resetTimer(id);
-  });
-  
-  requestAnimationFrame(() => {
-    zoomOverlay.classList.add('visible');
-  });
+    const t = timers.find(x => x.id === id);
+    playBtn.innerHTML = icons.play;
+    updateZoomTimerDigits(t.duration, t.duration);
+  };
 }
 
-function updateZoomTimerDigits(remSecs, totalSecs) {
+function updateZoomTimerDigits(remaining, duration) {
   const digitsEl = document.getElementById('zoom-digits-text');
   if (digitsEl) {
-    const hrs = Math.floor(remSecs / 3600);
-    const mins = Math.floor((remSecs % 3600) / 60);
-    const secs = remSecs % 60;
-    digitsEl.innerText = `${hrs > 0 ? String(hrs).padStart(2, '0') + ':' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const hrs = Math.floor(remaining / 3600);
+    const mins = Math.floor((remaining % 3600) / 60);
+    const secs = remaining % 60;
+    digitsEl.innerText = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
   
-  const circle = document.getElementById('zoom-progress-circle');
-  if (circle) {
-    const radius = 150;
-    const circumference = 2 * Math.PI * radius; // ~942.48
-    const pct = totalSecs > 0 ? (totalSecs - remSecs) / totalSecs : 0;
-    circle.style.strokeDashoffset = circumference - pct * circumference;
-  }
-}
-
-function getZoomDashOffset(timer) {
-  const radius = 150;
-  const circumference = 2 * Math.PI * radius;
-  const pct = timer.duration > 0 ? (timer.duration - timer.remaining) / timer.duration : 0;
-  return circumference - pct * circumference;
-}
-
-function exitZoomMode() {
-  const overlay = document.getElementById('timer-zoom-overlay');
-  if (overlay) {
-    overlay.classList.remove('visible');
-    setTimeout(() => {
-      overlay.remove();
-      activeZoomTimerId = null;
-    }, 200);
+  const fillEl = document.getElementById('zoom-progress-fill');
+  if (fillEl && duration > 0) {
+    fillEl.style.width = `${((duration - remaining) / duration) * 100}%`;
   }
 }

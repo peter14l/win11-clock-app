@@ -2479,3 +2479,151 @@ body.light-theme ::-webkit-scrollbar-thumb {
   }
 }
 
+/* Fluent Custom Dropdown */
+.fluent-dropdown-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.fluent-dropdown-trigger {
+  width: 100%;
+  height: 32px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s;
+  font-family: var(--font-family);
+}
+
+.fluent-dropdown-trigger:hover {
+  background-color: rgba(255, 255, 255, 0.09);
+  border-color: var(--border-hover);
+}
+
+.fluent-dropdown-trigger.active {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-bottom-color: var(--accent-color);
+}
+
+.fluent-dropdown-selected-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fluent-dropdown-arrow {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  transition: transform 0.15s;
+}
+
+.fluent-dropdown-trigger.active .fluent-dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.fluent-dropdown-menu {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: rgba(32, 32, 32, 0.95);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleY(0.9);
+  transform-origin: top;
+  transition: all 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
+  backdrop-filter: blur(15px);
+}
+
+.fluent-dropdown-menu.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scaleY(1);
+}
+
+.fluent-dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background-color 0.1s;
+  font-family: var(--font-family);
+}
+
+.fluent-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.fluent-dropdown-item.selected {
+  background-color: var(--accent-glow);
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+body.light-theme .fluent-dropdown-menu {
+  background-color: rgba(243, 243, 243, 0.95);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .fluent-dropdown-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .fluent-dropdown-item.selected {
+  background-color: rgba(0, 120, 212, 0.08);
+}
+
+/* Play button inside dropdown items */
+.fluent-dropdown-item-play-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.fluent-dropdown-item-play-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.fluent-dropdown-item-play-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-color);
+}
+
+.fluent-dropdown-item-play-btn.playing {
+  color: var(--accent-color);
+  animation: pulse 1s infinite alternate;
+}
+
+body.light-theme .fluent-dropdown-item-play-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-color);
+}
+
+
+
