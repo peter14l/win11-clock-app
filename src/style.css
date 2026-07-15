@@ -2388,10 +2388,10 @@ body.light-theme ::-webkit-scrollbar-thumb {
     transition: background-color 0.25s ease, border-color 0.25s ease;
   }
 
-  /* When backdrop-filter is active and supported, lower the background opacity to 45% so the blur is visible */
+  /* When backdrop-filter is active, adjust the background opacity to 65% to enable rich, high-contrast blur compositing */
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     .mobile-bottom-nav {
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(20, 20, 20, 0.45);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%), rgba(28, 28, 28, 0.65);
       backdrop-filter: blur(25px) saturate(140%);
       -webkit-backdrop-filter: blur(25px) saturate(140%);
     }
@@ -2405,7 +2405,7 @@ body.light-theme ::-webkit-scrollbar-thumb {
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     body.light-theme .mobile-bottom-nav {
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%), rgba(255, 255, 255, 0.4);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%), rgba(255, 255, 255, 0.6);
       backdrop-filter: blur(25px) saturate(140%);
       -webkit-backdrop-filter: blur(25px) saturate(140%);
     }
