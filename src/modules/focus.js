@@ -295,6 +295,9 @@ export function renderFocusView(container) {
             </div>
             <div class="progress-bar-target">Target: 45 min</div>
           </div>
+          <div id="focus-weekly-chart-container">
+            ${renderWeeklyChart()}
+          </div>
         </div>
       </div>
     </div>
@@ -965,6 +968,11 @@ function logFocusMinutes(mins) {
   if (progressFill) {
     progressFill.style.width = `${Math.min(100, (getTodayFocusMinutes() / 45) * 100)}%`;
   }
+  
+  const chartContainer = document.getElementById('focus-weekly-chart-container');
+  if (chartContainer) {
+    chartContainer.innerHTML = renderWeeklyChart();
+  }
 }
 
 function getTodayFocusMinutes() {
@@ -997,4 +1005,38 @@ function getStreakDays() {
     }
   }
   return streak;
+}
+
+function renderWeeklyChart() {
+  const today = new Date();
+  let barsHtml = '';
+  const targetMins = 45;
+  
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const record = focusHistory.find(h => h.date === dateStr);
+    const mins = record ? record.minutes : 0;
+    
+    const pct = Math.min(100, (mins / targetMins) * 100);
+    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'narrow' });
+    const tooltip = `${mins} mins focused on ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    const isToday = i === 0;
+    
+    barsHtml += `
+      <div class="chart-col" title="${tooltip}">
+        <div class="chart-bar-wrapper">
+          <div class="chart-bar-fill ${isToday ? 'today' : ''}" style="height: ${Math.max(4, pct)}%;"></div>
+        </div>
+        <div class="chart-day-label ${isToday ? 'today' : ''}">${dayLabel}</div>
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="focus-weekly-chart">
+      ${barsHtml}
+    </div>
+  `;
 }

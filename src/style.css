@@ -1089,6 +1089,60 @@ body.light-theme ::-webkit-scrollbar-thumb {
   text-align: right;
 }
 
+/* Weekly Bar Chart */
+.focus-weekly-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 80px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+  gap: 4px;
+}
+
+.chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.chart-bar-wrapper {
+  width: 8px;
+  height: 50px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.chart-bar-fill {
+  width: 100%;
+  background-color: var(--text-secondary);
+  border-radius: 4px;
+  transition: height 0.3s cubic-bezier(0.1, 0.9, 0.2, 1), background-color 0.3s;
+}
+
+.chart-bar-fill.today {
+  background-color: var(--accent-color);
+  box-shadow: 0 0 8px var(--accent-glow-strong);
+}
+
+.chart-day-label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.chart-day-label.today {
+  color: var(--accent-color);
+  font-weight: bold;
+}
+
 /* ========================================================
    ALARMS VIEW STYLING
    ======================================================== */
@@ -2301,25 +2355,29 @@ body.light-theme ::-webkit-scrollbar-thumb {
     display: none !important;
   }
   
+  .fluent-shell {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  
   .fluent-layout {
     height: 100%; /* occupy full height since titlebar is gone */
   }
   
   /* Reduce content padding and make space for floating bottom bar */
   .fluent-content-viewport {
-    padding: 16px 16px 96px 16px;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)) 16px;
   }
   
   /* Show mobile bottom nav bar as a floating pill with premium glassmorphism */
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
-    bottom: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     left: 16px;
     right: 16px;
     height: 64px;
-    /* Soft reflection layer with a more solid, legible dark tint background */
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(28, 28, 28, 0.75);
+    /* Soft reflection layer with a translucent, legible dark tint background to maximize blur */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(20, 20, 20, 0.45);
     border: 1px solid rgba(255, 255, 255, 0.15); /* Balanced glossy highlight border */
     border-radius: 32px;
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12), 0 8px 32px 0 rgba(0, 0, 0, 0.35);
@@ -2327,13 +2385,13 @@ body.light-theme ::-webkit-scrollbar-thumb {
     justify-content: space-around;
     align-items: center;
     padding: 0 8px;
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%); /* iOS support */
+    backdrop-filter: blur(25px) saturate(140%);
+    -webkit-backdrop-filter: blur(25px) saturate(140%); /* iOS support */
     transition: background-color 0.25s ease, border-color 0.25s ease;
   }
   
   body.light-theme .mobile-bottom-nav {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%), rgba(255, 255, 255, 0.65);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%), rgba(255, 255, 255, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.45);
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 32px 0 rgba(0, 0, 0, 0.1);
   }
