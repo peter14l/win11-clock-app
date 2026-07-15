@@ -85,7 +85,7 @@ export function renderAlarmView(container) {
       <button class="fluent-btn-icon header-action-btn" id="btn-add-alarm" title="Add new alarm">${icons.plus}</button>
     </div>
     
-    <div class="alarms-list" id="alarms-list">
+    <div class="alarms-container" id="alarms-list">
       ${renderAlarmsList()}
     </div>
   `;
@@ -103,7 +103,12 @@ export function renderAlarmView(container) {
 
 function renderAlarmsList() {
   if (alarms.length === 0) {
-    return `<div class="empty-alarms">No alarms set. Click the '+' button to add one.</div>`;
+    return `
+      <div class="empty-state-card">
+        <div class="empty-icon">${icons.alarm}</div>
+        <p>No alarms configured. Click the "+" button to add one.</p>
+      </div>
+    `;
   }
   
   return alarms.map(alarm => {
@@ -111,21 +116,22 @@ function renderAlarmsList() {
       return renderExpandedAlarm(alarm);
     }
     
-    const ampm = parseInt(alarm.time.split(':')[0]) >= 12 ? 'PM' : 'AM';
-    let hrs = parseInt(alarm.time.split(':')[0]) % 12;
+    const timeParts = alarm.time.split(':');
+    let hrs = parseInt(timeParts[0]);
+    const mins = timeParts[1];
+    const ampm = hrs >= 12 ? 'PM' : 'AM';
+    hrs = hrs % 12;
     hrs = hrs ? hrs : 12; // 0 should be 12
-    const timeDisplay = `${hrs}:${alarm.time.split(':')[1]}`;
+    const timeDisplay = `${hrs}:${mins} <span class="ampm-text">${ampm}</span>`;
+    
+    const repeatLabel = getRepeatLabel(alarm.repeat);
     
     return `
-      <div class="fluent-card alarm-item-card" data-id="${alarm.id}">
-        <div class="alarm-item-summary">
+      <div class="fluent-card alarm-item-card ${alarm.enabled ? '' : 'alarm-disabled'}" data-id="${alarm.id}">
+        <div class="alarm-item-clickable">
           <div class="alarm-time-block">
-            <span class="alarm-time-digits">${timeDisplay}</span>
-            <span class="alarm-time-ampm">${ampm}</span>
-          </div>
-          <div class="alarm-info-block">
-            <div class="alarm-name">${alarm.name}</div>
-            <div class="alarm-repeat-days">${getRepeatLabel(alarm.repeat)}</div>
+            <span class="alarm-digital-time">${timeDisplay}</span>
+            <span class="alarm-meta-info">${alarm.name ? alarm.name + ' • ' : ''}${repeatLabel}</span>
           </div>
           <div class="alarm-switch-container">
             <label class="fluent-switch">
