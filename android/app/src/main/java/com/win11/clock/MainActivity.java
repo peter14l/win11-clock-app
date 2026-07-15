@@ -176,10 +176,7 @@ public class MainActivity extends BridgeActivity {
             int id = intent.getIntExtra("id", -1);
             
             if (DeviceSoundPlugin.instance != null) {
-                JSObject response = new JSObject();
-                response.put("action", action);
-                response.put("id", id);
-                DeviceSoundPlugin.instance.notifyListeners("notificationAction", response);
+                DeviceSoundPlugin.instance.triggerNotificationAction(action, id);
             }
         }
     }
@@ -194,6 +191,14 @@ public class MainActivity extends BridgeActivity {
         public void load() {
             super.load();
             instance = this;
+        }
+
+        // Expose a public method to trigger event listeners inside the plugin instance
+        public void triggerNotificationAction(String action, int id) {
+            JSObject response = new JSObject();
+            response.put("action", action);
+            response.put("id", id);
+            notifyListeners("notificationAction", response);
         }
 
         // 0. Expose launch intent check to JS
@@ -220,14 +225,15 @@ public class MainActivity extends BridgeActivity {
             com.getcapacitor.JSArray array = new com.getcapacitor.JSArray();
             try {
                 while (cursor.moveToNext()) {
-                    String title = cursor.getString(RingtoneManager.TITLE_COLUMN);
-                    String id = cursor.getString(RingtoneManager.ID_COLUMN);
-                    String uri = cursor.getString(RingtoneManager.URI_COLUMN) + "/" + id;
+                    String title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX);
+                    Uri uri = manager.getRingtoneUri(cursor.getPosition());
                     
-                    JSObject tone = new JSObject();
-                    tone.put("title", title);
-                    tone.put("uri", uri);
-                    array.put(tone);
+                    if (uri != null) {
+                        JSObject tone = new JSObject();
+                        tone.put("title", title);
+                        tone.put("uri", uri.toString());
+                        array.put(tone);
+                    }
                 }
                 
                 JSObject result = new JSObject();

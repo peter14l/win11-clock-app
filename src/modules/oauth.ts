@@ -1,4 +1,4 @@
-import { storage, showToast } from './utils.js';
+import { storage, showToast } from './utils.ts';
 
 // Default Client IDs (can be overridden in Settings)
 // These are public Client IDs for Single Page Apps (no client secrets needed)
@@ -69,11 +69,11 @@ export const oauth = {
     
     const params = new URLSearchParams(hash.substring(1));
     const accessToken = params.get('access_token');
-    const expiresIn = params.get('expires_in') || 3600;
+    const expiresIn = params.get('expires_in');
     const state = params.get('state');
     
     if (accessToken) {
-      const expiryTime = Date.now() + parseInt(expiresIn) * 1000;
+      const expiryTime = Date.now() + parseInt(String(expiresIn ?? 3600)) * 1000;
       const pending = storage.get('oauth_pending', '');
       
       if (pending === 'spotify' || state === 'spotify_auth_state') {

@@ -250,7 +250,7 @@ export function createFluentDropdown({ id, options, value, onChange, onPreview, 
         <button class="fluent-dropdown-item-play-btn" title="Preview sound">${icons.play}</button>
       `;
       
-      const playBtn = item.querySelector('.fluent-dropdown-item-play-btn');
+      const playBtn = item.querySelector('.fluent-dropdown-item-play-btn') as HTMLElement;
       playBtn.onclick = (e) => {
         e.stopPropagation(); // prevent selecting
         
@@ -281,7 +281,7 @@ export function createFluentDropdown({ id, options, value, onChange, onPreview, 
       
       menu.querySelectorAll('.fluent-dropdown-item').forEach(el => el.classList.remove('selected'));
       item.classList.add('selected');
-      button.querySelector('.fluent-dropdown-selected-text').innerText = opt.text;
+      (button.querySelector('.fluent-dropdown-selected-text') as HTMLElement).innerText = opt.text;
       
       menu.classList.remove('visible');
       button.classList.remove('active');
@@ -341,7 +341,7 @@ export function createFluentDropdown({ id, options, value, onChange, onPreview, 
       // We stop preview when clicking outside
       const selectedItem = menu.querySelector('.fluent-dropdown-item.selected');
       if (selectedItem) {
-        onPreview(selectedItem.dataset.value, false);
+        onPreview((selectedItem as HTMLElement).dataset.value, false);
       }
     }
     menu.classList.remove('visible');

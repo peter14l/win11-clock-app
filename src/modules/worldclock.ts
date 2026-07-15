@@ -1,4 +1,4 @@
-import { storage, icons, showToast, showDialog } from './utils.js';
+import { storage, icons, showToast, showDialog, closeDialog } from './utils.ts';
 
 let pinnedClocks = [];
 let localClockInterval = null;
@@ -180,7 +180,7 @@ function getCityTimeData(timezone) {
     date.setHours(date.getHours() + compareHourOffset);
   }
   
-  const optionsTime = {
+  const optionsTime: Intl.DateTimeFormatOptions = {
     timeZone: timezone,
     hour: '2-digit',
     minute: '2-digit',
@@ -188,7 +188,7 @@ function getCityTimeData(timezone) {
     hour12: true
   };
   
-  const optionsDate = {
+  const optionsDate: Intl.DateTimeFormatOptions = {
     timeZone: timezone,
     month: 'short',
     day: 'numeric',
@@ -228,7 +228,7 @@ function getOffsetLabel(timezone) {
   const localDiff = new Date(localDateString);
   const destDiff = new Date(destDateString);
   
-  const offsetDiffHours = Math.round((destDiff - localDiff) / 3600000);
+  const offsetDiffHours = Math.round((Number(destDiff) - Number(localDiff)) / 3600000);
   
   if (offsetDiffHours === 0) return 'Same time';
   
@@ -255,7 +255,7 @@ function bindEvents() {
   const chkCompare = document.getElementById('chk-compare-mode');
   if (chkCompare) {
     chkCompare.addEventListener('change', (e) => {
-      isCompareMode = e.target.checked;
+      isCompareMode = (e.target as HTMLInputElement).checked;
       
       const sliderContainer = document.getElementById('compare-slider-container');
       const resetBtn = document.getElementById('btn-compare-reset');
@@ -271,7 +271,7 @@ function bindEvents() {
         if (resetBtn) resetBtn.style.display = 'none';
         compareHourOffset = 0;
         const slider = document.getElementById('compare-time-slider');
-        if (slider) slider.value = 0;
+        if (slider) (slider as HTMLInputElement).value = '0';
         showToast('Resumed live time');
       }
       updateClocks();
@@ -282,7 +282,7 @@ function bindEvents() {
   const slider = document.getElementById('compare-time-slider');
   if (slider) {
     slider.addEventListener('input', (e) => {
-      compareHourOffset = parseInt(e.target.value);
+      compareHourOffset = parseInt((e.target as HTMLInputElement).value);
       const display = document.getElementById('slider-offset-display');
       if (display) {
         display.innerText = `Offset: ${compareHourOffset > 0 ? '+' : ''}${compareHourOffset} hours`;
@@ -296,7 +296,7 @@ function bindEvents() {
     btnReset.addEventListener('click', () => {
       compareHourOffset = 0;
       const slider = document.getElementById('compare-time-slider');
-      if (slider) slider.value = 0;
+      if (slider) (slider as HTMLInputElement).value = '0';
       const display = document.getElementById('slider-offset-display');
       if (display) display.innerText = 'Offset: 0 hours';
       updateClocks();
@@ -307,7 +307,8 @@ function bindEvents() {
   const container = document.getElementById('pinned-clocks-container');
   if (container) {
     container.addEventListener('click', (e) => {
-      const delBtn = e.target.closest('.wc-delete-btn');
+      const target = e.target as HTMLElement;
+      const delBtn = target.closest('.wc-delete-btn') as HTMLElement | null;
       if (delBtn) {
         const tz = delBtn.dataset.timezone;
         unpinCity(tz);
@@ -372,9 +373,9 @@ function showAddCityDialog() {
   const input = content.querySelector('#city-search-input');
   const resultsContainer = content.querySelector('#city-results-list');
   
-  input.focus();
+  (input as HTMLElement).focus();
   input.addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase().trim();
+    const q = (e.target as HTMLInputElement).value.toLowerCase().trim();
     const filtered = cityDatabase.filter(city => {
       const isAlreadyPinned = pinnedClocks.some(p => p.timezone === city.timezone);
       const matchesQuery = city.name.toLowerCase().includes(q) || city.country.toLowerCase().includes(q);
@@ -395,7 +396,8 @@ function showAddCityDialog() {
   
   // Select row
   resultsContainer.addEventListener('click', (e) => {
-    const row = e.target.closest('.search-city-row');
+    const target = e.target as HTMLElement;
+    const row = target.closest('.search-city-row') as HTMLElement | null;
     if (row) {
       const tz = row.dataset.timezone;
       const city = cityDatabase.find(c => c.timezone === tz);
@@ -445,7 +447,7 @@ function updateClocks() {
   }
   
   if (localDateEl) {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     localDateEl.innerText = now.toLocaleDateString(undefined, options);
   }
   
@@ -456,10 +458,10 @@ function updateClocks() {
     
     const timeData = getCityTimeData(city.timezone);
     
-    const timeDigits = card.querySelector('.wc-digital-time');
+    const timeDigits = card.querySelector('.wc-digital-time') as HTMLElement | null;
     if (timeDigits) timeDigits.innerText = timeData.timeStr;
     
-    const dateText = card.querySelector('.wc-date-text');
+    const dateText = card.querySelector('.wc-date-text') as HTMLElement | null;
     if (dateText) dateText.innerText = timeData.dateStr;
     
     // Toggle class based on time comparison hour

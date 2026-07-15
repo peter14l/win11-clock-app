@@ -1,6 +1,6 @@
-import { storage, icons, showToast } from './utils.js';
-import { oauth } from './oauth.js';
-import * as audio from './audio.js';
+import { storage, icons, showToast } from './utils.ts';
+import { oauth } from './oauth.ts';
+import * as audio from './audio.ts';
 
 let focusTimerInterval = null;
 let focusSecondsRemaining = 0;
@@ -72,10 +72,10 @@ async function msGraphRequest(endpoint, options = {}) {
   const token = oauth.getMicrosoftToken();
   if (!token) return null;
   
-  const headers = {
+  const headers: Record<string, string> = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
-    ...options.headers
+    ...(options as { headers?: Record<string, string> }).headers
   };
   
   try {
@@ -146,9 +146,9 @@ async function spotifyRequest(endpoint, options = {}) {
   const token = oauth.getSpotifyToken();
   if (!token) return null;
   
-  const headers = {
+  const headers: Record<string, string> = {
     'Authorization': `Bearer ${token}`,
-    ...options.headers
+    ...(options as { headers?: Record<string, string> }).headers
   };
   
   try {
@@ -473,10 +473,10 @@ function bindEvents() {
   const timeInput = document.getElementById('focus-time-input');
   if (timeInput) {
     timeInput.addEventListener('change', (e) => {
-      let val = parseInt(e.target.value);
+      let val = parseInt((e.target as HTMLInputElement).value);
       if (isNaN(val) || val < 5) val = 5;
       if (val > 240) val = 240;
-      e.target.value = val;
+      (e.target as HTMLInputElement).value = String(val);
       focusMinutesConfig = val;
       storage.set('focus_minutes', focusMinutesConfig);
       document.getElementById('break-info-text').innerText = `Will include a ${getBreakLength(val)} minute break`;
@@ -487,10 +487,10 @@ function bindEvents() {
   const decBtn = document.getElementById('focus-dec-btn');
   if (decBtn) {
     decBtn.addEventListener('click', () => {
-      const input = document.getElementById('focus-time-input');
+      const input = document.getElementById('focus-time-input') as HTMLInputElement;
       let val = parseInt(input.value) - 5;
       if (val >= 5) {
-        input.value = val;
+        input.value = String(val);
         input.dispatchEvent(new Event('change'));
       }
     });
@@ -499,10 +499,10 @@ function bindEvents() {
   const incBtn = document.getElementById('focus-inc-btn');
   if (incBtn) {
     incBtn.addEventListener('click', () => {
-      const input = document.getElementById('focus-time-input');
+      const input = document.getElementById('focus-time-input') as HTMLInputElement;
       let val = parseInt(input.value) + 5;
       if (val <= 240) {
-        input.value = val;
+        input.value = String(val);
         input.dispatchEvent(new Event('change'));
       }
     });
@@ -511,7 +511,7 @@ function bindEvents() {
   const chkSkipBreaks = document.getElementById('chk-skip-breaks');
   if (chkSkipBreaks) {
     chkSkipBreaks.addEventListener('change', (e) => {
-      skipBreaks = e.target.checked;
+      skipBreaks = (e.target as HTMLInputElement).checked;
       storage.set('skip_breaks', skipBreaks);
     });
   }
@@ -529,7 +529,7 @@ function bindEvents() {
   if (btnTaskCancel) {
     btnTaskCancel.addEventListener('click', () => {
       document.getElementById('task-input-form').style.display = 'none';
-      document.getElementById('new-task-input').value = '';
+      (document.getElementById('new-task-input') as HTMLInputElement).value = '';
     });
   }
   
@@ -552,16 +552,16 @@ function bindEvents() {
   const tasksListEl = document.getElementById('focus-tasks-list');
   if (tasksListEl) {
     tasksListEl.addEventListener('click', (e) => {
-      const checkbox = e.target.closest('.task-checkbox');
-      const text = e.target.closest('.task-text');
-      const deleteBtn = e.target.closest('.btn-delete-task');
+      const checkbox = (e.target as HTMLElement).closest('.task-checkbox');
+      const text = (e.target as HTMLElement).closest('.task-text');
+      const deleteBtn = (e.target as HTMLElement).closest('.btn-delete-task');
       
       if (checkbox) {
-        toggleTaskComplete(checkbox.dataset.id);
+        toggleTaskComplete((checkbox as HTMLElement).dataset.id);
       } else if (text) {
-        selectActiveTask(text.dataset.id);
+        selectActiveTask((text as HTMLElement).dataset.id);
       } else if (deleteBtn) {
-        deleteTask(deleteBtn.dataset.id);
+        deleteTask((deleteBtn as HTMLElement).dataset.id);
       }
     });
   }
@@ -588,7 +588,7 @@ function bindEvents() {
     const tiles = spotifyContainer.querySelectorAll('.playlist-tile');
     tiles.forEach(tile => {
       tile.addEventListener('click', () => {
-        playPlaylist(tile.dataset.id);
+        playPlaylist((tile as HTMLElement).dataset.id);
       });
     });
   }
@@ -600,7 +600,7 @@ function bindEvents() {
   const volControl = document.getElementById('spotify-vol-control');
   if (volControl) {
     volControl.addEventListener('input', (e) => {
-      spotifyVolume = parseFloat(e.target.value) / 100;
+      spotifyVolume = parseFloat((e.target as HTMLInputElement).value) / 100;
       audio.setVolume(spotifyVolume);
     });
   }
@@ -731,14 +731,14 @@ function updateTimerUI() {
     if (focusTotalSeconds > 0) {
       pct = (focusTotalSeconds - focusSecondsRemaining) / focusTotalSeconds;
     }
-    circle.style.strokeDashoffset = circumference - pct * circumference;
+    circle.style.strokeDashoffset = String(circumference - pct * circumference);
     circle.style.stroke = focusMode === 'break' ? '#107c41' : 'var(--accent-color)';
   }
 }
 
 // Tasks Management CRUD Operations
 async function saveNewTask() {
-  const input = document.getElementById('new-task-input');
+  const input = document.getElementById('new-task-input') as HTMLInputElement;
   const text = input.value.trim();
   if (text === '') return;
   
@@ -773,8 +773,8 @@ async function saveNewTask() {
     showToast('Local task created', 'success');
   }
   
-  document.getElementById('task-input-form').style.display = 'none';
-  input.value = '';
+  (document.getElementById('task-input-form') as HTMLElement).style.display = 'none';
+  (input as HTMLInputElement).value = '';
   refreshTasksUI();
 }
 
@@ -936,8 +936,8 @@ function startVisualizer() {
       const dataIdx = Math.floor(index * (data.length / bars.length));
       const val = data[dataIdx] || 0;
       const heightPercent = Math.max(5, (val / 255) * 100);
-      bar.style.height = `${heightPercent}%`;
-      bar.style.backgroundColor = `hsl(200, 100%, ${Math.min(80, 50 + (val/5))}%`;
+      (bar as HTMLElement).style.height = `${heightPercent}%`;
+      (bar as HTMLElement).style.backgroundColor = `hsl(200, 100%, ${Math.min(80, 50 + (val/5))}%`;
     });
   }
   
@@ -983,7 +983,7 @@ function getTodayFocusMinutes() {
 
 function getStreakDays() {
   if (focusHistory.length === 0) return 0;
-  const sorted = [...focusHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sorted = [...focusHistory].sort((a, b) => Number(new Date(b.date)) - Number(new Date(a.date)));
   const todayStr = new Date().toISOString().split('T')[0];
   
   let streak = 0;

@@ -1,5 +1,5 @@
-import { storage, icons, showDialog, closeDialog, showToast, createFluentDropdown } from './utils.js';
-import * as audio from './audio.js';
+import { storage, icons, showDialog, closeDialog, showToast, createFluentDropdown } from './utils.ts';
+import * as audio from './audio.ts';
 
 let alarms = [];
 let snoozeTimers = []; // { id, alarmId, triggerTime }
@@ -233,6 +233,7 @@ function initExpandedDropdowns(alarm) {
       onChange: (val) => {
         // Value updated
       },
+      onPreview: undefined,
       container: snoozeContainer
     });
   }
@@ -288,12 +289,13 @@ function bindEvents() {
   const listEl = document.getElementById('alarms-list');
   if (listEl) {
     listEl.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
       // 1. Intercept switch toggles and stop event propagation!
-      const switchEl = e.target.closest('.fluent-switch');
+      const switchEl = target.closest('.fluent-switch');
       if (switchEl) {
-        const checkbox = switchEl.querySelector('.alarm-toggle-checkbox');
+        const checkbox = switchEl.querySelector('.alarm-toggle-checkbox') as HTMLInputElement | null;
         if (checkbox) {
-          if (e.target !== checkbox) {
+          if (target !== checkbox) {
             checkbox.checked = !checkbox.checked;
           }
           toggleAlarm(parseInt(checkbox.dataset.id), checkbox.checked);
@@ -303,27 +305,27 @@ function bindEvents() {
         return;
       }
       
-      const dayDot = e.target.closest('.day-dot-btn');
+      const dayDot = target.closest('.day-dot-btn') as HTMLElement | null;
       if (dayDot) {
         dayDot.classList.toggle('active');
         return;
       }
       
-      const saveBtn = e.target.closest('.btn-save-alarm');
+      const saveBtn = target.closest('.btn-save-alarm') as HTMLElement | null;
       if (saveBtn) {
         const id = parseInt(saveBtn.dataset.id);
         saveAlarmDetails(id);
         return;
       }
       
-      const cancelBtn = e.target.closest('.btn-cancel-alarm');
+      const cancelBtn = target.closest('.btn-cancel-alarm') as HTMLElement | null;
       if (cancelBtn) {
         const id = parseInt(cancelBtn.dataset.id);
         closeAlarmEdit(id);
         return;
       }
       
-      const deleteBtn = e.target.closest('.btn-delete-alarm');
+      const deleteBtn = target.closest('.btn-delete-alarm') as HTMLElement | null;
       if (deleteBtn) {
         const id = parseInt(deleteBtn.dataset.id);
         deleteAlarm(id);
@@ -331,8 +333,8 @@ function bindEvents() {
       }
       
       // If clicked on the card itself (excluding buttons/dropdown triggers), expand it
-      const card = e.target.closest('.alarm-item-card');
-      const isDropdownClick = e.target.closest('.fluent-dropdown-wrapper') !== null;
+      const card = target.closest('.alarm-item-card') as HTMLElement | null;
+      const isDropdownClick = target.closest('.fluent-dropdown-wrapper') !== null;
       if (card && !card.classList.contains('expanded-alarm-card') && !isDropdownClick) {
         const id = parseInt(card.dataset.id);
         expandAlarm(id);
@@ -401,17 +403,17 @@ function saveAlarmDetails(id) {
   const card = document.getElementById(`expanded-alarm-${id}`);
   if (!card) return;
   
-  const timeVal = card.querySelector(`#edit-time-${id}`).value;
-  const nameVal = card.querySelector(`#edit-name-${id}`).value.trim() || 'Alarm';
+  const timeVal = (card.querySelector(`#edit-time-${id}`) as HTMLInputElement).value;
+  const nameVal = (card.querySelector(`#edit-name-${id}`) as HTMLInputElement).value.trim() || 'Alarm';
   
   const activeDots = card.querySelectorAll('.day-dot-btn.active');
-  const repeatVal = Array.from(activeDots).map(dot => parseInt(dot.dataset.day));
+  const repeatVal = Array.from(activeDots).map(dot => parseInt((dot as HTMLElement).dataset.day));
   
   // Read value from custom Fluent dropdown elements
-  const soundItem = card.querySelector(`#edit-sound-dropdown-${id} .fluent-dropdown-item.selected`);
+  const soundItem = card.querySelector(`#edit-sound-dropdown-${id} .fluent-dropdown-item.selected`) as HTMLElement | null;
   const soundVal = soundItem ? soundItem.dataset.value : 'digital';
   
-  const snoozeItem = card.querySelector(`#edit-snooze-dropdown-${id} .fluent-dropdown-item.selected`);
+  const snoozeItem = card.querySelector(`#edit-snooze-dropdown-${id} .fluent-dropdown-item.selected`) as HTMLElement | null;
   const snoozeVal = snoozeItem ? parseInt(snoozeItem.dataset.value) : 10;
   
   alarms = alarms.map(a => {
@@ -450,7 +452,7 @@ function refreshList() {
     
     const expandedCard = listEl.querySelector('.expanded-alarm-card');
     if (expandedCard) {
-      const alarmId = parseInt(expandedCard.dataset.id);
+      const alarmId = parseInt((expandedCard as HTMLElement).dataset.id);
       const alarm = alarms.find(a => a.id === alarmId);
       if (alarm) {
         initExpandedDropdowns(alarm);

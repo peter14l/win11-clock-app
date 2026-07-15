@@ -12,9 +12,10 @@ let visualizerAnalyser = null;
 let synthGainNode = null;
 
 // Lazily initialize Audio Context
+const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
 function getAudioContext() {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx = new AudioCtx();
     visualizerAnalyser = audioCtx.createAnalyser();
     visualizerAnalyser.fftSize = 64;
     synthGainNode = audioCtx.createGain();

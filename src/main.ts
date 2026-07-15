@@ -1,12 +1,12 @@
 import './style.css';
 import { icons, storage } from './modules/utils.js';
-import { initSettingsModule } from './modules/settings.js';
-import { initFocusModule, renderFocusView } from './modules/focus.js';
-import { initAlarmModule, renderAlarmView } from './modules/alarm.js';
-import { initTimerModule, renderTimerView } from './modules/timer.js';
-import { initStopwatchModule, renderStopwatchView } from './modules/stopwatch.js';
-import { initWorldClockModule, renderWorldClockView } from './modules/worldclock.js';
-import { renderSettingsView } from './modules/settings.js';
+import { initSettingsModule } from './modules/settings.ts';
+import { initFocusModule, renderFocusView } from './modules/focus.ts';
+import { initAlarmModule, renderAlarmView } from './modules/alarm.ts';
+import { initTimerModule, renderTimerView } from './modules/timer.ts';
+import { initStopwatchModule, renderStopwatchView } from './modules/stopwatch.ts';
+import { initWorldClockModule, renderWorldClockView } from './modules/worldclock.ts';
+import { renderSettingsView } from './modules/settings.ts';
 import { oauth } from './modules/oauth.js';
 
 // Elements
@@ -89,7 +89,7 @@ function bindNavigation() {
   // Desktop Nav items click
   navItems.forEach(item => {
     item.addEventListener('click', (e) => {
-      const clickedItem = e.currentTarget;
+      const clickedItem = (e.currentTarget as HTMLElement);
       const view = clickedItem.dataset.view;
       if (view && view !== currentView) {
         switchView(view);
@@ -100,7 +100,7 @@ function bindNavigation() {
   // Mobile Nav items click
   mobileNavItems.forEach(item => {
     item.addEventListener('click', (e) => {
-      const clickedItem = e.currentTarget;
+      const clickedItem = (e.currentTarget as HTMLElement);
       const view = clickedItem.dataset.view;
       if (view && view !== currentView) {
         switchView(view);
@@ -120,7 +120,7 @@ function switchView(view) {
   
   // Sync desktop navigation active state
   navItems.forEach(nav => {
-    if (nav.dataset.view === view) {
+    if ((nav as HTMLElement).dataset.view === view) {
       nav.classList.add('active');
     } else {
       nav.classList.remove('active');
@@ -129,7 +129,7 @@ function switchView(view) {
 
   // Sync mobile navigation active state
   mobileNavItems.forEach(nav => {
-    if (nav.dataset.view === view) {
+    if ((nav as HTMLElement).dataset.view === view) {
       nav.classList.add('active');
     } else {
       nav.classList.remove('active');
@@ -151,7 +151,7 @@ function switchView(view) {
       if (firstInput) {
         // Don't auto-focus on mobile to avoid keyboard popup
         if (window.innerWidth > 768) {
-          firstInput.focus();
+          (firstInput as HTMLElement).focus();
         }
       }
     }, 100);

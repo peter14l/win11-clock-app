@@ -1,5 +1,5 @@
-import { storage, showToast, showDialog } from './utils.js';
-import { oauth } from './oauth.js';
+import { storage, showToast, showDialog } from './utils.ts';
+import { oauth } from './oauth.ts';
 
 let theme = 'dark';
 let accentColor = '#60cdff'; // default blue
@@ -144,7 +144,7 @@ function bindEvents() {
   const radios = document.querySelectorAll('input[name="settings-theme"]');
   radios.forEach(radio => {
     radio.addEventListener('change', (e) => {
-      const selectedTheme = e.target.value;
+      const selectedTheme = (e.target as HTMLInputElement).value;
       theme = selectedTheme;
       storage.set('app_theme', selectedTheme);
       applyTheme(selectedTheme);
@@ -158,7 +158,7 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       colorBtns.forEach(b => b.classList.remove('active'));
       const isLightTheme = document.body.classList.contains('light-theme');
-      const selectedColor = isLightTheme ? btn.dataset.colorLight : btn.dataset.colorDark;
+      const selectedColor = isLightTheme ? (btn as HTMLElement).dataset.colorLight : (btn as HTMLElement).dataset.colorDark;
       
       accentColor = selectedColor;
       storage.set('app_accent_color', selectedColor);
@@ -204,8 +204,8 @@ function bindEvents() {
   const btnSaveCreds = document.getElementById('btn-save-credentials');
   if (btnSaveCreds) {
     btnSaveCreds.addEventListener('click', () => {
-      const spotifyId = document.getElementById('setting-spotify-client-id').value.trim();
-      const microsoftId = document.getElementById('setting-microsoft-client-id').value.trim();
+      const spotifyId = (document.getElementById('setting-spotify-client-id') as HTMLInputElement).value.trim();
+      const microsoftId = (document.getElementById('setting-microsoft-client-id') as HTMLInputElement).value.trim();
       
       if (!spotifyId || !microsoftId) {
         showToast('Client IDs cannot be empty', 'error');

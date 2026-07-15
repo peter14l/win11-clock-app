@@ -1,5 +1,5 @@
-import { storage, icons, showDialog, closeDialog, showToast, createFluentDropdown } from './utils.js';
-import * as audio from './audio.js';
+import { storage, icons, showDialog, closeDialog, showToast, createFluentDropdown } from './utils.ts';
+import * as audio from './audio.ts';
 
 let timers = [];
 let timerTicker = null;
@@ -113,10 +113,11 @@ function bindEvents() {
   const gridEl = document.getElementById('timers-list-grid');
   if (gridEl) {
     gridEl.addEventListener('click', (e) => {
-      const toggle = e.target.closest('.btn-timer-toggle');
-      const reset = e.target.closest('.btn-timer-reset');
-      const zoom = e.target.closest('.btn-timer-zoom');
-      const del = e.target.closest('.timer-delete-btn');
+      const target = e.target as HTMLElement;
+      const toggle = target.closest('.btn-timer-toggle') as HTMLElement | null;
+      const reset = target.closest('.btn-timer-reset') as HTMLElement | null;
+      const zoom = target.closest('.btn-timer-zoom') as HTMLElement | null;
+      const del = target.closest('.timer-delete-btn') as HTMLElement | null;
       
       if (toggle) {
         toggleTimer(parseInt(toggle.dataset.id));
@@ -339,6 +340,7 @@ function showAddTimerDialog() {
       options: hrsOptions,
       value: '0',
       onChange: () => {},
+      onPreview: undefined,
       container: dialogEl.querySelector('#timer-pick-hrs-container')
     });
     
@@ -347,6 +349,7 @@ function showAddTimerDialog() {
       options: minsOptions,
       value: '15', // default 15 minutes
       onChange: () => {},
+      onPreview: undefined,
       container: dialogEl.querySelector('#timer-pick-mins-container')
     });
     
@@ -355,6 +358,7 @@ function showAddTimerDialog() {
       options: secsOptions,
       value: '0',
       onChange: () => {},
+      onPreview: undefined,
       container: dialogEl.querySelector('#timer-pick-secs-container')
     });
   }

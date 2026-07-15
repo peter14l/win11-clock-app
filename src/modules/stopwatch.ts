@@ -1,4 +1,4 @@
-import { storage, icons, showToast } from './utils.js';
+import { storage, icons, showToast } from './utils.ts';
 
 let stopwatchStartTime = 0;
 let stopwatchElapsedTime = 0;
@@ -154,8 +154,8 @@ function toggleStopwatch() {
     stopwatchElapsedTime = Date.now() - stopwatchStartTime;
     
     if (toggleBtn) toggleBtn.innerHTML = icons.play;
-    if (lapBtn) lapBtn.disabled = true;
-    if (resetBtn) resetBtn.disabled = false;
+    if (lapBtn) (lapBtn as HTMLButtonElement).disabled = true;
+    if (resetBtn) (resetBtn as HTMLButtonElement).disabled = false;
     
     showToast('Stopwatch paused');
   } else {
@@ -165,8 +165,8 @@ function toggleStopwatch() {
     startLoop();
     
     if (toggleBtn) toggleBtn.innerHTML = icons.pause;
-    if (lapBtn) lapBtn.disabled = false;
-    if (resetBtn) resetBtn.disabled = false;
+    if (lapBtn) (lapBtn as HTMLButtonElement).disabled = false;
+    if (resetBtn) (resetBtn as HTMLButtonElement).disabled = false;
     
     showToast('Stopwatch started');
   }
@@ -204,7 +204,7 @@ function recordLap() {
   
   const countBadge = document.getElementById('laps-count-badge');
   if (countBadge) {
-    countBadge.innerText = laps.length;
+    countBadge.innerText = String(laps.length);
   }
   
   showToast(`Lap ${newLap.lapNum} recorded`, 'info');
@@ -223,10 +223,10 @@ function resetStopwatch() {
   if (toggleBtn) toggleBtn.innerHTML = icons.play;
   
   const lapBtn = document.getElementById('btn-stopwatch-lap');
-  if (lapBtn) lapBtn.disabled = true;
+  if (lapBtn) (lapBtn as HTMLButtonElement).disabled = true;
   
   const resetBtn = document.getElementById('btn-stopwatch-reset');
-  if (resetBtn) resetBtn.disabled = true;
+  if (resetBtn) (resetBtn as HTMLButtonElement).disabled = true;
   
   // Reset digital display
   updateDisplay(0);
@@ -239,7 +239,7 @@ function resetStopwatch() {
   
   const countBadge = document.getElementById('laps-count-badge');
   if (countBadge) {
-    countBadge.innerText = 0;
+    countBadge.innerText = String(0);
   }
   
   showToast('Stopwatch reset');
