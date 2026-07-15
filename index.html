@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- SEO Metadata -->
+    <title>Windows 11 Clock</title>
+    <meta name="description" content="A high-performance Windows 11 Fluent UI style clock app featuring focus sessions, alarms, timers, stopwatch, and world clock." />
+    <!-- Typography: Premium clean Fluent-like font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="dark-theme">
+    <div class="fluent-shell">
+      <!-- Title bar for Windows 11 App look (hidden on mobile) -->
+      <div class="fluent-title-bar">
+        <div class="title-bar-left">
+          <span class="app-logo-icon" id="app-title-logo"></span>
+          <span class="app-title-text">Clock</span>
+        </div>
+        <div class="title-bar-right">
+          <div class="window-control-btn min-btn"></div>
+          <div class="window-control-btn max-btn"></div>
+          <div class="window-control-btn close-btn"></div>
+        </div>
+      </div>
+      
+      <div class="fluent-layout">
+        <!-- Sidebar Navigation (Desktop only) -->
+        <aside class="fluent-sidebar" id="app-sidebar">
+          <button class="sidebar-toggle-btn" id="btn-sidebar-toggle" title="Toggle Navigation">
+            <span class="icon-span" id="icon-menu-toggle"></span>
+          </button>
+          
+          <nav class="sidebar-nav">
+            <button class="nav-item active" data-view="focus" id="nav-focus">
+              <span class="icon-span" id="icon-nav-focus"></span>
+              <span class="nav-text">Focus sessions</span>
+            </button>
+            
+            <button class="nav-item" data-view="alarm" id="nav-alarm">
+              <span class="icon-span" id="icon-nav-alarm"></span>
+              <span class="nav-text">Alarm</span>
+            </button>
+            
+            <button class="nav-item" data-view="timer" id="nav-timer">
+              <span class="icon-span" id="icon-nav-timer"></span>
+              <span class="nav-text">Timer</span>
+            </button>
+            
+            <button class="nav-item" data-view="stopwatch" id="nav-stopwatch">
+              <span class="icon-span" id="icon-nav-stopwatch"></span>
+              <span class="nav-text">Stopwatch</span>
+            </button>
+            
+            <button class="nav-item" data-view="worldclock" id="nav-worldclock">
+              <span class="icon-span" id="icon-nav-worldclock"></span>
+              <span class="nav-text">World clock</span>
+            </button>
+          </nav>
+          
+          <div class="sidebar-footer">
+            <button class="nav-item" data-view="settings" id="nav-settings">
+              <span class="icon-span" id="icon-nav-settings"></span>
+              <span class="nav-text">Settings</span>
+            </button>
+          </div>
+        </aside>
+        
+        <!-- Main Content Viewport -->
+        <main class="fluent-content-viewport">
+          <div class="fluent-content-container" id="main-view-content">
+            <!-- Dynamically injected views here -->
+          </div>
+        </main>
+      </div>
+
+      <!-- Bottom Navigation Bar (Mobile only) -->
+      <nav class="mobile-bottom-nav">
+        <button class="mobile-nav-item active" data-view="focus" id="m-nav-focus">
+          <span class="mobile-icon-span" id="m-icon-nav-focus"></span>
+          <span class="mobile-nav-text">Focus</span>
+        </button>
+        <button class="mobile-nav-item" data-view="alarm" id="m-nav-alarm">
+          <span class="mobile-icon-span" id="m-icon-nav-alarm"></span>
+          <span class="mobile-nav-text">Alarm</span>
+        </button>
+        <button class="mobile-nav-item" data-view="timer" id="m-nav-timer">
+          <span class="mobile-icon-span" id="m-icon-nav-timer"></span>
+          <span class="mobile-nav-text">Timer</span>
+        </button>
+        <button class="mobile-nav-item" data-view="stopwatch" id="m-nav-stopwatch">
+          <span class="mobile-icon-span" id="m-icon-nav-stopwatch"></span>
+          <span class="mobile-nav-text">Stop</span>
+        </button>
+        <button class="mobile-nav-item" data-view="worldclock" id="m-nav-worldclock">
+          <span class="mobile-icon-span" id="m-icon-nav-worldclock"></span>
+          <span class="mobile-nav-text">World</span>
+        </button>
+        <button class="mobile-nav-item" data-view="settings" id="m-nav-settings">
+          <span class="mobile-icon-span" id="m-icon-nav-settings"></span>
+          <span class="mobile-nav-text">Settings</span>
+        </button>
+      </nav>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

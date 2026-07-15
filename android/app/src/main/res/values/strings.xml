@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Windows 11 Clock</string>
+    <string name="title_activity_main">Windows 11 Clock</string>
+    <string name="package_name">com.win11.clock</string>
+    <string name="custom_url_scheme">com.win11.clock</string>
+</resources>
